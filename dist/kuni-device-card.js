@@ -3,7 +3,7 @@
  * Shows the device, the fill level of every loaded scent, and lets you switch
  * scent, power, intensity and the run timer. Only standard HA services are used. */
 const KUNI_DOMAIN = "kuni";
-const KUNI_VERSION = "0.1.6";
+const KUNI_VERSION = "0.1.7";
 const BAD_STATES = new Set(["unknown", "unavailable"]);
 const SLOT_COUNT = 3;
 const TIMER_PRESETS = [1800, 3600, 7200, 14400];
@@ -97,12 +97,19 @@ function levelTone(level) {
 }
 
 // Seconds left on the run timer, counted down locally between polls.
-function remainingSeconds(state, now = Date.now()) {
+// The device keeps reporting the duration that was set (it does not count down),
+// so the countdown starts from the last state change. `local` is a timer set from
+// this card ({seconds, at}); it wins when it is newer than the last state change,
+// which covers setting the same duration again (the state then does not change).
+function remainingSeconds(state, now = Date.now(), local) {
   if (!state || BAD_STATES.has(state.state)) return 0;
   const value = Number(state.state);
+  const stamp = Date.parse(state.last_updated || state.last_reported || "");
+  if (local && local.seconds > 0 && (!Number.isFinite(stamp) || local.at > stamp)) {
+    return Math.max(0, Math.round(local.seconds - Math.max(0, (now - local.at) / 1000)));
+  }
   // The device reports 1 while running without a timer.
   if (!Number.isFinite(value) || value <= 1) return 0;
-  const stamp = Date.parse(state.last_reported || state.last_updated || "");
   const elapsed = Number.isFinite(stamp) ? Math.max(0, (now - stamp) / 1000) : 0;
   return Math.max(0, Math.round(value - elapsed));
 }
@@ -248,7 +255,7 @@ class KuniDeviceCard extends HTMLElement {
   _state(role) { return this._hass?.states?.[this._roles[role]]; }
   _startTicker() {
     clearInterval(this._ticker);
-    this._ticker = setInterval(() => { if (remainingSeconds(this._state("time_left")) > 0) this._render(); }, 1000);
+    this._ticker = setInterval(() => { if (this._timeLeft() > 0) this._render(); }, 1000);
   }
   async _discover(retry = false) {
     this._resolving = true;
@@ -272,6 +279,7 @@ class KuniDeviceCard extends HTMLElement {
       if (generation === this._generation) { this._resolved = true; this._resolving = false; this._render(); }
     }
   }
+  _timeLeft() { return remainingSeconds(this._state("time_left"), Date.now(), this._timerSet); }
   _isOn() { return this._state("power")?.state === "on"; }
   _available() { const p = this._state("power"); return !!p && !BAD_STATES.has(p.state); }
   _slots() {
@@ -337,6 +345,7 @@ class KuniDeviceCard extends HTMLElement {
     } else if (d.action === "timer") {
       const seconds = Number(d.seconds);
       if (!this._device) return;
+      this._timerSet = seconds > 0 ? { seconds, at: Date.now() } : undefined;
       if (seconds > 0) this._call(KUNI_DOMAIN, "set_timer", { device_id: this._device.id, duration_seconds: seconds });
       else if (this._roles.power) this._call("switch", "turn_on", { entity_id: this._roles.power });
     }
@@ -360,7 +369,7 @@ class KuniDeviceCard extends HTMLElement {
       const current = Number(intensity?.state);
       const min = Number(intensity?.attributes?.min ?? 1);
       const max = Number(intensity?.attributes?.max ?? 7);
-      const left = remainingSeconds(this._state("time_left"));
+      const left = this._timeLeft();
       const name = this._config.name || this._device.name_by_user || this._device.name || "Kuni";
       const status = !available ? t("unavailable") : [
         `<b>${on ? t("on") : t("off")}</b>`,
