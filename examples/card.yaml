@@ -1,1 +1,5 @@
-
+type: custom:kuni-device-card
+# Optional:
+# device_id: YOUR_HA_DEVICE_ID   # only needed with more than one Kuni
+# name: Living Room Kuni
+# language: he                   # he | en (default: HA language)
