@@ -3,6 +3,11 @@
 A Home Assistant dashboard card for the **Kuni** scent diffuser, built on the
 [Kuni integration](https://github.com/taltaub22/Kuni-HomeAssistant).
 
+<p align="center">
+  <img src="docs/card-en.webp" alt="Kuni Device Card (English)" width="380">
+  <img src="docs/card-he.webp" alt="Kuni Device Card (Hebrew)" width="380">
+</p>
+
 - **Device header** – the diffuser, its name, on/off state, active scent and a live timer countdown, plus a large power button.
 - **My scents** – one tile per cartridge with a ring showing how much is left (green, amber under 50%, red under 20%). Tap a tile to switch to that scent.
 - **Intensity** – the seven device levels as tap targets.
