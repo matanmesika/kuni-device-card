@@ -157,3 +157,28 @@ test('tapped scent shows at once, and rapid taps send only the newest choice', a
 test('a running diffuser without a timer (value 1) shows no countdown', () => {
   assert.equal(get('remainingSeconds')(st('1', {}, { last_updated: new Date().toISOString() })), 0);
 });
+
+test('setting the same timer again restarts the countdown from the tap', () => {
+  const rs = get('remainingSeconds');
+  const now = Date.parse('2026-11-22T10:20:00Z');
+  // The device reported 1800 at 10:00 and keeps reporting 1800.
+  const s = st('1800', {}, { last_updated: '2026-11-22T10:00:00Z' });
+  assert.equal(rs(s, now), 600);
+  // 30 min tapped again at 10:15: the state does not change, the tap wins.
+  assert.equal(rs(s, now, { seconds: 1800, at: Date.parse('2026-11-22T10:15:00Z') }), 1500);
+  // A newer state change (e.g. a timer set from the Kuni app) wins over an older tap.
+  const s2 = st('3600', {}, { last_updated: '2026-11-22T10:18:00Z' });
+  assert.equal(rs(s2, now, { seconds: 1800, at: Date.parse('2026-11-22T10:15:00Z') }), 3480);
+  // Running without a timer after an old tap: no countdown.
+  const s3 = st('1', {}, { last_updated: '2026-11-22T10:18:00Z' });
+  assert.equal(rs(s3, now, { seconds: 1800, at: Date.parse('2026-11-22T10:15:00Z') }), 0);
+});
+
+test('a timer tap is remembered by the card for the countdown', async () => {
+  const c = card();
+  click(c, { action: 'timer', seconds: '1800' });
+  await Promise.resolve();
+  assert.equal(c._timerSet.seconds, 1800);
+  click(c, { action: 'timer', seconds: '0' });
+  assert.equal(c._timerSet, undefined);
+});
