@@ -3,7 +3,7 @@
  * Shows the device, the fill level of every loaded scent, and lets you switch
  * scent, power, intensity and the run timer. Only standard HA services are used. */
 const KUNI_DOMAIN = "kuni";
-const KUNI_VERSION = "0.1.7";
+const KUNI_VERSION = "0.1.8";
 const BAD_STATES = new Set(["unknown", "unavailable"]);
 const SLOT_COUNT = 3;
 const TIMER_PRESETS = [1800, 3600, 7200, 14400];
@@ -166,16 +166,20 @@ const KUNI_STYLES = `
   .name{font-size:20px;font-weight:600;line-height:1.25;margin:0;word-break:break-word}
   .status{margin-top:4px;color:var(--secondary-text-color);font-size:14px;line-height:1.4}
   .status b{color:var(--kuni-accent);font-weight:600}
-  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent}
+  button{font:inherit;color:inherit;border:0;background:none;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:box-shadow .18s ease,background .15s ease,transform .1s ease}
+  button:not(:disabled):hover{box-shadow:0 8px 24px rgba(0,0,0,.5),0 0 0 1px color-mix(in srgb,var(--kuni-accent) 55%,transparent)}
   button:disabled{cursor:default;opacity:.45}
   button:focus-visible{outline:2px solid var(--primary-color);outline-offset:2px}
   .power{width:56px;height:56px;border-radius:50%;display:grid;place-items:center;background:var(--secondary-background-color,#eee);color:var(--secondary-text-color);transition:background .2s,color .2s,box-shadow .2s}
+  .power:not(:disabled):hover{box-shadow:0 8px 22px color-mix(in srgb,var(--kuni-accent) 55%,transparent)}
   .power ha-icon{--mdc-icon-size:28px}
   ha-card[data-on=true] .power{background:var(--kuni-accent);color:var(--text-primary-color,#fff);box-shadow:0 6px 18px color-mix(in srgb,var(--kuni-accent) 45%,transparent)}
   h3{font-size:15px;font-weight:600;margin:22px 0 10px;display:flex;justify-content:space-between;align-items:baseline;gap:8px}
   h3 small{font-size:13px;font-weight:400;color:var(--secondary-text-color)}
   .slots{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
   .slot{position:relative;display:grid;justify-items:center;gap:6px;padding:14px 6px 12px;border-radius:20px;background:var(--secondary-background-color,#f4f4f4);border:2px solid transparent;min-height:132px;transition:border-color .2s,transform .1s}
+  .slot{transition:border-color .2s,transform .15s,box-shadow .18s}
+  .slot:not(:disabled):hover{transform:translateY(-2px);border-color:color-mix(in srgb,var(--slot-color,var(--kuni-accent)) 60%,transparent);box-shadow:0 10px 26px rgba(0,0,0,.5),0 0 18px color-mix(in srgb,var(--slot-color,var(--kuni-accent)) 30%,transparent)}
   .slot:active:not(:disabled){transform:scale(.97)}
   .slot[data-active=true]{border-color:var(--slot-color);background:color-mix(in srgb,var(--slot-color) 12%,var(--secondary-background-color,#f4f4f4))}
   .ring{position:relative;width:64px;height:64px}
@@ -189,18 +193,16 @@ const KUNI_STYLES = `
   .tag{font-size:11px;padding:2px 8px;border-radius:999px;color:var(--secondary-text-color);background:var(--card-background-color,#fff)}
   .slot[data-active=true] .tag{background:var(--slot-color);color:#fff}
   .slot[data-tone=low] .tag:not(.on){color:var(--error-color,#db4437)}
-  .steps{display:grid;grid-template-columns:repeat(7,minmax(0,1fr));gap:6px}
-  .step{height:44px;border-radius:12px;background:var(--secondary-background-color,#f1f1f1);font-weight:600;color:var(--secondary-text-color)}
-  .step[data-filled=true]{background:color-mix(in srgb,var(--kuni-accent) calc(30% + var(--i) * 10%),var(--secondary-background-color,#f1f1f1));color:var(--text-primary-color,#fff)}
-  .step[data-current=true]{box-shadow:inset 0 0 0 2px var(--kuni-accent)}
-  .chips{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:8px}
-  .chip{min-height:44px;padding:0 6px;white-space:nowrap;border-radius:999px;background:var(--secondary-background-color,#f1f1f1);font-weight:500}
-  .chip[data-selected=true]{background:var(--kuni-accent);color:var(--text-primary-color,#fff)}
+  /* intensity and timer: one segmented pill bar */
+  .steps,.chips{display:flex;gap:2px;padding:3px;border-radius:999px;box-sizing:border-box;border:1px solid var(--divider-color,rgba(127,127,127,.25));background:var(--secondary-background-color,#f1f1f1)}
+  .step,.chip{flex:1 1 0;min-width:0;padding:7px 4px;border-radius:999px;background:transparent;color:var(--primary-text-color);font-size:.9rem;font-weight:400;white-space:nowrap}
+  .step[data-current=true],.chip[data-selected=true]{background:var(--kuni-accent);color:var(--text-primary-color,#fff);font-weight:500;box-shadow:none}
+  .step:not(:disabled):not([data-current=true]):hover,.chip:not(:disabled):not([data-selected=true]):hover{background:color-mix(in srgb,var(--kuni-accent) 14%,transparent);box-shadow:0 4px 14px rgba(0,0,0,.45)}
   .countdown{font-variant-numeric:tabular-nums;color:var(--kuni-accent);font-weight:600}
   .message{margin-top:14px;padding:10px 12px;border-radius:12px;background:color-mix(in srgb,var(--error-color,#db4437) 12%,transparent);color:var(--error-color,#db4437);font-size:13px}
   .empty{padding:8px 0;color:var(--secondary-text-color)}
   ha-card[data-pending=true] .controls{opacity:.7}
-  @media (max-width:420px){ha-card{padding:16px}.device{width:80px;height:104px}.device svg{width:66px;height:92px}.power{width:50px;height:50px}.slot{min-height:122px}.ring,.ring svg{width:56px;height:56px}.step{height:42px}}
+  @media (max-width:420px){ha-card{padding:16px}.device{width:80px;height:104px}.device svg{width:66px;height:92px}.power{width:50px;height:50px}.slot{min-height:122px}.ring,.ring svg{width:56px;height:56px}.step,.chip{font-size:.85rem;padding:6px 2px}}
   @media (prefers-reduced-motion:reduce){ha-card[data-on=true] .device .kuni-mist{animation:none}}
 `;
 
