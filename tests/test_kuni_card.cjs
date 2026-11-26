@@ -213,3 +213,16 @@ test('editor sets and clears entity overrides and the photo', () => {
   assert.equal(e._config.entities, undefined);
   assert.equal(e.events.at(-1).detail.config.image, '/local/kuni.webp');
 });
+
+test('extra_styles is added to the card CSS on every render and cannot end the style tag', () => {
+  const c = card({ 'switch.renamed_power': st('on'), 'select.kuni_scent': st('Lavender', { options: ['Lavender'] }) });
+  c.setConfig({ language: 'en', extra_styles: '.photo { width: 90px; } </STYLE><img src=x onerror=alert(1)>' });
+  c._device = device; c._resolved = true; c._roles = get('resolveRoles')(device, entries);
+  c._html = undefined; c._render();
+  const html = c.shadowRoot.innerHTML;
+  assert.match(html, /\.photo \{ width: 90px; \}/);
+  assert.equal((html.match(/<\/style>/gi) || []).length, 1);
+  const validate = get('validateConfig');
+  assert.throws(() => validate({ extra_styles: 5 }), /extra_styles/);
+  assert.doesNotThrow(() => validate({ extra_styles: '' }));
+});
