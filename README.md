@@ -15,7 +15,7 @@ Captured from the card with the scents and fill levels of a real Kuni in Home As
 
 ## Features
 
-- **Device header:** the diffuser, its name, on/off state, active scent and a live timer countdown, with a large power button.
+- **Device header:** a photo of the diffuser (shipped with the card), its name, on/off state, active scent and a live timer countdown, with a large power button.
 - **My scents:** one tile per cartridge with a ring for how much is left (green, amber under 50%, red under 20%). Tap a tile to switch to that scent.
 - **Intensity:** the seven device levels in one segmented bar.
 - **Timer:** no timer, 30 min, 1 h, 2 h or 4 h, using the `kuni.set_timer` service.
@@ -38,7 +38,7 @@ The **[Kuni integration](https://github.com/taltaub22/Kuni-HomeAssistant)**, ins
 
 ### Manual
 
-Copy `dist/kuni-device-card.js` to `<config>/www/kuni-device-card/`, then add `/local/kuni-device-card/kuni-device-card.js` as a **JavaScript module** under **Settings → Dashboards → ⋮ → Resources**.
+Copy `dist/kuni-device-card.js` and `dist/kuni.webp` to `<config>/www/community/kuni-device-card/`, then add `/local/community/kuni-device-card/kuni-device-card.js` as a **JavaScript module** under **Settings → Dashboards → ⋮ → Resources**.
 
 ## Setup
 
@@ -65,7 +65,7 @@ type: custom:kuni-device-card
 device_id: 0123456789abcdef0123456789abcdef
 name: Living Room Kuni
 language: he
-image: /local/kuni-device-card/kuni.webp
+image: /local/my-kuni.webp
 scent_colors:
   Soft: "#e58fb4"
 entities:
@@ -81,7 +81,7 @@ entities:
 | `entity` | — | Any entity of the Kuni, as another way to choose the device. |
 | `name` | device name | Name shown in the header. |
 | `language` | Home Assistant language | `he` or `en`. |
-| `image` | built-in drawing | Your own device photo (`/local/…`, `/api/…` or `/hacsfiles/…`). A transparent background works best. |
+| `image` | photo shipped with the card | Your own device photo (`/local/…`, `/api/…` or `/hacsfiles/…`; a transparent background works best), or `none` for the built-in drawing. |
 | `scent_colors` | built-in colours | Colour per scent name, e.g. `{Soft: "#e58fb4"}`. Used for the ring, the active tile and the glow while it runs. |
 | `entities` | automatic | Per-role entity overrides (see below). |
 | `extra_styles` | — | Extra CSS for the card, e.g. `.photo { width: 90px; }`. The card adds it itself on every render, so it works where card-mod can't (the card rebuilds its content). |
@@ -126,6 +126,6 @@ This is an unofficial project, not affiliated with Kuni.
 
 **הגדרה אוטומטית:** `type: custom:kuni-device-card`. הכרטיס מוצא לבד את המכשיר ואת כל הישויות שלו.
 
-**הגדרה ידנית:** בעורך הוויזואלי בוחרים מכשיר, שם, שפה, תמונה, ואת כל ישות בנפרד (הפעלה, ריח פעיל, עוצמה, זמן נותר, וכל אחת משלוש הקפסולות). מה שנבחר ידנית גובר על הזיהוי האוטומטי.
+**הגדרה ידנית:** בעורך הוויזואלי בוחרים מכשיר, שם, שפה, תמונה (ברירת המחדל היא תמונת המכשיר שמגיעה עם הכרטיס), ואת כל ישות בנפרד (הפעלה, ריח פעיל, עוצמה, זמן נותר, וכל אחת משלוש הקפסולות). מה שנבחר ידנית גובר על הזיהוי האוטומטי.
 
 נדרשת האינטגרציה [Kuni](https://github.com/taltaub22/Kuni-HomeAssistant).
