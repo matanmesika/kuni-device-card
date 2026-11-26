@@ -84,6 +84,7 @@ entities:
 | `image` | built-in drawing | Your own device photo (`/local/…`, `/api/…` or `/hacsfiles/…`). A transparent background works best. |
 | `scent_colors` | built-in colours | Colour per scent name, e.g. `{Soft: "#e58fb4"}`. Used for the ring, the active tile and the glow while it runs. |
 | `entities` | automatic | Per-role entity overrides (see below). |
+| `extra_styles` | — | Extra CSS for the card, e.g. `.photo { width: 90px; }`. The card adds it itself on every render, so it works where card-mod can't (the card rebuilds its content). |
 
 ### Entities the card uses
 
