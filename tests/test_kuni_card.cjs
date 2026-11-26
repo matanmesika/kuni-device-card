@@ -226,3 +226,16 @@ test('extra_styles is added to the card CSS on every render and cannot end the s
   assert.throws(() => validate({ extra_styles: 5 }), /extra_styles/);
   assert.doesNotThrow(() => validate({ extra_styles: '' }));
 });
+
+test('the bundled photo is shown by default; image: none or a custom image replace it', () => {
+  const c = card();
+  c._render();
+  assert.match(c.shadowRoot.innerHTML, /<img class="photo" src="\/local\/community\/kuni-device-card\/kuni\.webp"/);
+  c._config = { language: 'en', image: 'none' }; c._render();
+  assert.doesNotMatch(c.shadowRoot.innerHTML, /class="photo"/);
+  assert.ok(c.shadowRoot.innerHTML.includes(get("DEVICE_ART")));
+  c._config = { language: 'en', image: '/local/my.png' }; c._render();
+  assert.match(c.shadowRoot.innerHTML, /src="\/local\/my\.png"/);
+  c._config = { language: 'en' }; c._photoFailed = true; c._render();
+  assert.doesNotMatch(c.shadowRoot.innerHTML, /class="photo"/);
+});
