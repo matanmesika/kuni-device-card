@@ -37,3 +37,7 @@ Manual: copy `dist/kuni-device-card.js` to `/config/www/kuni-device-card/` and a
 
 ## Tests
 `node --test tests/test_kuni_card.cjs`
+
+## License
+
+[MIT](LICENSE) © 2026 Matan Mesika
