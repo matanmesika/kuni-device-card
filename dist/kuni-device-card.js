@@ -3,7 +3,9 @@
  * Shows the device, the fill level of every loaded scent, and lets you switch
  * scent, power, intensity and the run timer. Only standard HA services are used. */
 const KUNI_DOMAIN = "kuni";
-const KUNI_VERSION = "0.2.1";
+const KUNI_VERSION = "0.2.2";
+// Photo shipped next to the card (HACS installs both into www/community/kuni-device-card/).
+const DEFAULT_PHOTO = "/local/community/kuni-device-card/kuni.webp";
 const BAD_STATES = new Set(["unknown", "unavailable"]);
 const SLOT_COUNT = 3;
 const TIMER_PRESETS = [1800, 3600, 7200, 14400];
@@ -138,7 +140,7 @@ function validateConfig(config) {
   if (config.language && !["he", "en"].includes(config.language)) throw new Error("language must be he or en");
   if (config.device_id && typeof config.device_id !== "string") throw new Error("device_id must be a string");
   if (config.extra_styles !== undefined && typeof config.extra_styles !== "string") throw new Error("extra_styles must be a CSS string");
-  if (config.image && (typeof config.image !== "string" || !/^\/(?:local|api|hacsfiles)\/[^\s"'<>]+$/.test(config.image))) throw new Error("image must be a /local/, /api/ or /hacsfiles/ URL");
+  if (config.image && config.image !== "none" && (typeof config.image !== "string" || !/^\/(?:local|api|hacsfiles)\/[^\s"'<>]+$/.test(config.image))) throw new Error("image must be a /local/, /api/ or /hacsfiles/ URL, or none");
   for (const [role, id] of Object.entries(config.entities || {})) {
     if (!ROLES[role] || typeof id !== "string" || !id.startsWith(`${ROLES[role][0]}.`)) throw new Error(`Invalid entity for ${role}`);
   }
@@ -232,6 +234,16 @@ class KuniDeviceCard extends HTMLElement {
       this._holdTimer = setTimeout(() => this._release(), 1500);
     });
     for (const type of ["pointerup", "pointercancel"]) this.shadowRoot.addEventListener(type, () => setTimeout(() => this._release(), 60));
+    // If the bundled photo is missing (e.g. a manual install without it), fall back to the drawing.
+    this.shadowRoot.addEventListener("error", (event) => {
+      if (event.target?.classList?.contains("photo") && !this._config?.image) { this._photoFailed = true; this._render(); }
+    }, true);
+  }
+  _photo() {
+    const image = this._config?.image;
+    if (image === "none") return "";
+    if (image) return image;
+    return this._photoFailed ? "" : DEFAULT_PHOTO;
   }
   _release() {
     clearTimeout(this._holdTimer);
@@ -409,7 +421,7 @@ class KuniDeviceCard extends HTMLElement {
       const chips = [`<button class="chip" data-action="timer" data-seconds="0" data-selected="${on && left === 0}" ${disabled}>${t("no_timer")}</button>`]
         .concat(TIMER_PRESETS.map((sec) => `<button class="chip" data-action="timer" data-seconds="${sec}" ${disabled}>${presetLabel(sec, t)}</button>`)).join("");
       body = `<div class="hero">
-          <div class="device">${this._config.image ? `<img class="photo" src="${escapeHTML(this._config.image)}" alt="">` : DEVICE_ART}</div>
+          <div class="device">${this._photo() ? `<img class="photo" src="${escapeHTML(this._photo())}" alt="">` : DEVICE_ART}</div>
           <div><p class="name">${escapeHTML(name)}</p><div class="status">${status}</div></div>
           <button class="power" data-action="power" aria-label="${on ? t("turn_off") : t("turn_on")}" aria-pressed="${on}" ${disabled || !this._roles.power ? "disabled" : ""}><ha-icon icon="mdi:power"></ha-icon></button>
         </div>
@@ -474,7 +486,7 @@ class KuniDeviceCardEditor extends HTMLElement {
       <label>${this._t("editor_device")}<select data-field="device_id"><option value="">${this._t("automatic")}</option>${devices.map((d) => `<option value="${escapeHTML(d.id)}" ${d.id === c.device_id ? "selected" : ""}>${escapeHTML(d.name_by_user || d.name || d.id)}</option>`).join("")}</select></label>
       <label>${this._t("editor_name")}<input data-field="name" value="${escapeHTML(c.name || "")}"></label>
       <label>${this._t("editor_language")}<select data-field="language"><option value="" ${!c.language ? "selected" : ""}>${this._t("automatic")}</option><option value="he" ${c.language === "he" ? "selected" : ""}>עברית</option><option value="en" ${c.language === "en" ? "selected" : ""}>English</option></select></label>
-      <label>${this._t("editor_image")}<input data-field="image" value="${escapeHTML(c.image || "")}" placeholder="/local/kuni-device-card/kuni.webp"></label>
+      <label>${this._t("editor_image")}<input data-field="image" value="${escapeHTML(c.image || "")}" placeholder="${DEFAULT_PHOTO}"></label>
       <h3 style="font-size:14px;margin:18px 0 4px">${this._t("editor_entities")}</h3>
       ${Object.entries(ROLES).map(([role, [domain]]) => {
         const chosen = c.entities?.[role] || "";
