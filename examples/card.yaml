@@ -3,3 +3,7 @@ type: custom:kuni-device-card
 # device_id: YOUR_HA_DEVICE_ID   # only needed with more than one Kuni
 # name: Living Room Kuni
 # language: he                   # he | en (default: HA language)
+# image: /local/kuni-device-card/kuni.webp
+# scent_colors: {Soft: "#e58fb4"}
+# entities:                      # override any entity found on the device
+#   power: switch.living_room_kuni_power

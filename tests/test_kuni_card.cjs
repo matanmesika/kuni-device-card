@@ -182,3 +182,34 @@ test('a timer tap is remembered by the card for the countdown', async () => {
   click(c, { action: 'timer', seconds: '0' });
   assert.equal(c._timerSet, undefined);
 });
+
+test('entities picked by hand replace the ones found on the device', async () => {
+  const c = new (elements.get('kuni-device-card'))();
+  c._render = () => {};
+  c.setConfig({ language: 'en', entities: { power: 'switch.my_power', slot_1: 'sensor.my_slot' } });
+  c._hass = { language: 'en', states: {}, callWS: async (m) => (m.type === 'config/device_registry/list' ? [device] : entries) };
+  await c._discover();
+  assert.equal(c._roles.power, 'switch.my_power');
+  assert.equal(c._roles.slot_1, 'sensor.my_slot');
+  assert.equal(c._roles.intensity, 'number.kuni_intensity');
+});
+
+test('entity overrides must match the role domain', () => {
+  const validate = get('validateConfig');
+  assert.throws(() => validate({ entities: { power: 'sensor.wrong' } }), /power/);
+  assert.throws(() => validate({ entities: { nope: 'switch.x' } }), /nope/);
+  assert.doesNotThrow(() => validate({ entities: { intensity: 'number.ok' } }));
+});
+
+test('editor sets and clears entity overrides and the photo', () => {
+  const e = new (elements.get('kuni-device-card-editor'))();
+  e._render = () => {};
+  e.setConfig({ language: 'en' });
+  e._change({ target: { dataset: { role: 'power' }, value: 'switch.p' } });
+  assert.equal(JSON.stringify(e._config.entities), JSON.stringify({ power: 'switch.p' }));
+  e._change({ target: { dataset: { field: 'image' }, value: '/local/kuni.webp' } });
+  assert.equal(e._config.image, '/local/kuni.webp');
+  e._change({ target: { dataset: { role: 'power' }, value: '' } });
+  assert.equal(e._config.entities, undefined);
+  assert.equal(e.events.at(-1).detail.config.image, '/local/kuni.webp');
+});

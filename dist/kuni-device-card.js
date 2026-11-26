@@ -3,7 +3,7 @@
  * Shows the device, the fill level of every loaded scent, and lets you switch
  * scent, power, intensity and the run timer. Only standard HA services are used. */
 const KUNI_DOMAIN = "kuni";
-const KUNI_VERSION = "0.1.9";
+const KUNI_VERSION = "0.2.0";
 const BAD_STATES = new Set(["unknown", "unavailable"]);
 const SLOT_COUNT = 3;
 const TIMER_PRESETS = [1800, 3600, 7200, 14400];
@@ -45,7 +45,7 @@ const TEXT = {
     timer: "טיימר", no_timer: "ללא טיימר", left: "נותרו", active: "פעיל", empty: "ריק", low: "כמעט נגמר",
     slot: "קפסולה", turn_on: "הפעלה", turn_off: "כיבוי", select_scent: "בחירת ריח", not_found: "לא נמצא מכשיר Kuni. בחרו מכשיר בהגדרות הכרטיס.",
     registry_error: "לא ניתן לקרוא את רשימת המכשירים.", failed: "הפקודה נכשלה. נסו שוב.", min: "ד׳", hour: "ש׳",
-    editor_device: "מכשיר", editor_name: "שם להצגה", editor_language: "שפה", automatic: "אוטומטי", level: "מילוי",
+    editor_device: "מכשיר", editor_name: "שם להצגה", editor_language: "שפה", editor_image: "תמונת המכשיר (‎/local/…‎)", editor_entities: "ישויות (ריק = אוטומטי מהמכשיר)", role_power: "הפעלה", role_scent: "ריח פעיל", role_intensity: "עוצמת פיזור", role_time_left: "זמן נותר", role_slot_1: "קפסולה 1", role_slot_2: "קפסולה 2", role_slot_3: "קפסולה 3", automatic: "אוטומטי", level: "מילוי",
     timer_running: "יכבה בעוד", sending: "שולח…",
   },
   en: {
@@ -53,7 +53,7 @@ const TEXT = {
     timer: "Timer", no_timer: "No timer", left: "left", active: "Active", empty: "Empty", low: "Running low",
     slot: "Slot", turn_on: "Turn on", turn_off: "Turn off", select_scent: "Choose scent", not_found: "No Kuni device found. Pick a device in the card settings.",
     registry_error: "Could not read the device registry.", failed: "The command failed. Please try again.", min: "m", hour: "h",
-    editor_device: "Device", editor_name: "Display name", editor_language: "Language", automatic: "Automatic", level: "Level",
+    editor_device: "Device", editor_name: "Display name", editor_language: "Language", editor_image: "Device photo (/local/…)", editor_entities: "Entities (empty = found on the device)", role_power: "Power", role_scent: "Current scent", role_intensity: "Intensity", role_time_left: "Time left", role_slot_1: "Slot 1", role_slot_2: "Slot 2", role_slot_3: "Slot 3", automatic: "Automatic", level: "Level",
     timer_running: "Turns off in", sending: "Sending…",
   },
 };
@@ -132,6 +132,9 @@ function validateConfig(config) {
   if (config.language && !["he", "en"].includes(config.language)) throw new Error("language must be he or en");
   if (config.device_id && typeof config.device_id !== "string") throw new Error("device_id must be a string");
   if (config.image && (typeof config.image !== "string" || !/^\/(?:local|api|hacsfiles)\/[^\s"'<>]+$/.test(config.image))) throw new Error("image must be a /local/, /api/ or /hacsfiles/ URL");
+  for (const [role, id] of Object.entries(config.entities || {})) {
+    if (!ROLES[role] || typeof id !== "string" || !id.startsWith(`${ROLES[role][0]}.`)) throw new Error(`Invalid entity for ${role}`);
+  }
   return { ...config };
 }
 
@@ -272,7 +275,8 @@ class KuniDeviceCard extends HTMLElement {
       const [devices, entries] = await registryCache.get(key);
       if (generation !== this._generation) return;
       this._device = resolveDevice(this._config, devices, entries);
-      this._roles = this._device ? resolveRoles(this._device, entries) : {};
+      // Entities picked by hand replace the ones found on the device.
+      this._roles = { ...(this._device ? resolveRoles(this._device, entries) : {}), ...(this._config.entities || {}) };
       this._registryError = "";
     } catch {
       registryCache.delete(key);
@@ -441,10 +445,15 @@ class KuniDeviceCardEditor extends HTMLElement {
   _t(key) { const lang = this._config?.language || (this._hass?.language?.startsWith("he") ? "he" : "en"); return TEXT[lang][key] || key; }
   _change(event) {
     const field = event.target?.dataset?.field;
-    if (!field) return;
+    if (!field && !event.target?.dataset?.role) return;
     const config = { ...this._config };
     const value = event.target.value;
-    if (value) config[field] = value; else delete config[field];
+    const role = event.target?.dataset?.role;
+    if (role) {
+      const entities = { ...(config.entities || {}) };
+      if (value) entities[role] = value; else delete entities[role];
+      if (Object.keys(entities).length) config.entities = entities; else delete config.entities;
+    } else if (value) config[field] = value; else delete config[field];
     this._config = config;
     this.dispatchEvent(new CustomEvent("config-changed", { detail: { config }, bubbles: true, composed: true }));
     this._render();
@@ -457,7 +466,15 @@ class KuniDeviceCardEditor extends HTMLElement {
     const html = `<style>:host{display:block}label{display:grid;gap:6px;font-size:13px;margin:12px 0}input,select{font:inherit;color:inherit;background:var(--secondary-background-color);border:1px solid var(--divider-color);border-radius:8px;padding:10px;min-height:44px;box-sizing:border-box;width:100%}</style>
       <label>${this._t("editor_device")}<select data-field="device_id"><option value="">${this._t("automatic")}</option>${devices.map((d) => `<option value="${escapeHTML(d.id)}" ${d.id === c.device_id ? "selected" : ""}>${escapeHTML(d.name_by_user || d.name || d.id)}</option>`).join("")}</select></label>
       <label>${this._t("editor_name")}<input data-field="name" value="${escapeHTML(c.name || "")}"></label>
-      <label>${this._t("editor_language")}<select data-field="language"><option value="" ${!c.language ? "selected" : ""}>${this._t("automatic")}</option><option value="he" ${c.language === "he" ? "selected" : ""}>עברית</option><option value="en" ${c.language === "en" ? "selected" : ""}>English</option></select></label>`;
+      <label>${this._t("editor_language")}<select data-field="language"><option value="" ${!c.language ? "selected" : ""}>${this._t("automatic")}</option><option value="he" ${c.language === "he" ? "selected" : ""}>עברית</option><option value="en" ${c.language === "en" ? "selected" : ""}>English</option></select></label>
+      <label>${this._t("editor_image")}<input data-field="image" value="${escapeHTML(c.image || "")}" placeholder="/local/kuni-device-card/kuni.webp"></label>
+      <h3 style="font-size:14px;margin:18px 0 4px">${this._t("editor_entities")}</h3>
+      ${Object.entries(ROLES).map(([role, [domain]]) => {
+        const chosen = c.entities?.[role] || "";
+        const ids = Object.keys(this._hass?.states || {}).filter((id) => id.startsWith(`${domain}.`)).sort();
+        if (chosen && !ids.includes(chosen)) ids.unshift(chosen);
+        return `<label>${this._t(`role_${role}`)}<select data-role="${role}"><option value="">${this._t("automatic")}</option>${ids.map((id) => `<option value="${escapeHTML(id)}" ${id === chosen ? "selected" : ""}>${escapeHTML(this._hass.states[id]?.attributes?.friendly_name ? `${this._hass.states[id].attributes.friendly_name} — ${id}` : id)}</option>`).join("")}</select></label>`;
+      }).join("")}`;
     if (html === this._html) return;
     this._html = html;
     this.shadowRoot.innerHTML = html;
