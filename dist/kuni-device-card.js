@@ -3,7 +3,7 @@
  * Shows the device, the fill level of every loaded scent, and lets you switch
  * scent, power, intensity and the run timer. Only standard HA services are used. */
 const KUNI_DOMAIN = "kuni";
-const KUNI_VERSION = "0.2.0";
+const KUNI_VERSION = "0.2.1";
 const BAD_STATES = new Set(["unknown", "unavailable"]);
 const SLOT_COUNT = 3;
 const TIMER_PRESETS = [1800, 3600, 7200, 14400];
@@ -127,10 +127,17 @@ function presetLabel(seconds, t) {
   return seconds >= 3600 ? `${seconds / 3600} ${t("hour")}` : `${seconds / 60} ${t("min")}`;
 }
 
+// Extra CSS from the card config. The shadow DOM is rebuilt on every render, which drops
+// card-mod, so the card adds this CSS itself. `</style` is escaped so it cannot end the tag.
+function extraStyles(config) {
+  return typeof config.extra_styles === "string" ? config.extra_styles.replace(/<\/style/gi, "<\\/style") : "";
+}
+
 function validateConfig(config) {
   if (!config || typeof config !== "object") throw new Error("Invalid configuration");
   if (config.language && !["he", "en"].includes(config.language)) throw new Error("language must be he or en");
   if (config.device_id && typeof config.device_id !== "string") throw new Error("device_id must be a string");
+  if (config.extra_styles !== undefined && typeof config.extra_styles !== "string") throw new Error("extra_styles must be a CSS string");
   if (config.image && (typeof config.image !== "string" || !/^\/(?:local|api|hacsfiles)\/[^\s"'<>]+$/.test(config.image))) throw new Error("image must be a /local/, /api/ or /hacsfiles/ URL");
   for (const [role, id] of Object.entries(config.entities || {})) {
     if (!ROLES[role] || typeof id !== "string" || !id.startsWith(`${ROLES[role][0]}.`)) throw new Error(`Invalid entity for ${role}`);
@@ -418,7 +425,7 @@ class KuniDeviceCard extends HTMLElement {
       this._accent = active?.color;
     }
     const accent = this._accent ? `--kuni-accent:${this._accent};` : "";
-    const html = `<style>${KUNI_STYLES}</style><ha-card dir="${dir}" style="${accent}" data-on="${this._isOn()}" data-pending="${this._pending}">${body}</ha-card>`;
+    const html = `<style>${KUNI_STYLES}${extraStyles(this._config)}</style><ha-card dir="${dir}" style="${accent}" data-on="${this._isOn()}" data-pending="${this._pending}">${body}</ha-card>`;
     if (html === this._html) return;
     this._html = html;
     this.shadowRoot.innerHTML = html;
