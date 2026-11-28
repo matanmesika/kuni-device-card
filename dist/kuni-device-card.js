@@ -3,7 +3,7 @@
  * Shows the device, the fill level of every loaded scent, and lets you switch
  * scent, power, intensity and the run timer. Only standard HA services are used. */
 const KUNI_DOMAIN = "kuni";
-const KUNI_VERSION = "0.2.2";
+const KUNI_VERSION = "0.2.3";
 // Photo shipped next to the card (HACS installs both into www/community/kuni-device-card/).
 const DEFAULT_PHOTO = "/local/community/kuni-device-card/kuni.webp";
 const BAD_STATES = new Set(["unknown", "unavailable"]);
@@ -203,7 +203,7 @@ const KUNI_STYLES = `
   .ring span{position:absolute;inset:0;display:grid;place-items:center;font-size:15px;font-weight:700}
   .scent{font-size:14px;font-weight:600;text-align:center;line-height:1.25;max-width:100%;overflow:hidden;text-overflow:ellipsis;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical}
   .tag{font-size:11px;padding:2px 8px;border-radius:999px;color:var(--secondary-text-color);background:var(--card-background-color,#fff)}
-  .slot[data-active=true] .tag{background:var(--slot-color);color:#fff}
+  .slot[data-active=true] .tag{background:var(--slot-color);color:var(--text-primary-color,#fff)}
   .slot[data-tone=low] .tag:not(.on){color:var(--error-color,#db4437)}
   /* intensity and timer: one segmented pill bar */
   .steps,.chips{display:flex;gap:2px;padding:3px;border-radius:999px;box-sizing:border-box;border:1px solid var(--divider-color,rgba(127,127,127,.25));background:var(--secondary-background-color,#f1f1f1)}
@@ -268,7 +268,25 @@ class KuniDeviceCard extends HTMLElement {
     const first = !this._hass;
     this._hass = hass;
     if (this._config && (first || !this._resolved) && !this._resolving) this._discover();
+    if (!first && this._resolved && !this._relevantChanged(hass)) return;
     this._render();
+  }
+  // Home Assistant hands every card a new hass object on each state change anywhere in the
+  // house (several times a second). Rebuilding the card each time costs CPU, makes icons flash
+  // and can swallow taps, so only redraw when one of this card's own entities or the language
+  // changed (and at least every 30 s, for anything shown relative to the current time).
+  _relevantChanged(hass) {
+    const seen = this._seen || {};
+    const next = { __lang: hass.locale?.language || hass.language, __now: seen.__now || 0 };
+    let changed = next.__lang !== seen.__lang || Date.now() - next.__now > 30000;
+    for (const id of Object.values(this._roles || {})) {
+      if (typeof id !== "string" || !id) continue;
+      next[id] = hass.states[id];
+      if (next[id] !== seen[id]) changed = true;
+    }
+    if (changed) next.__now = Date.now();
+    this._seen = next;
+    return changed;
   }
   getCardSize() { return 6; }
   getGridOptions() { return { columns: 12, min_columns: 6 }; }
